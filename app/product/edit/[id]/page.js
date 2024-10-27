@@ -1,4 +1,4 @@
-'use client'
+'use client';
 import Link from 'next/link';
 import React, { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -11,14 +11,16 @@ const Page = ({ params }) => {
         product_name: "",
         price: "",
         description: "",
-        status: ""
+        status: "",
+        image: null
     });
     const [successMessage, setSuccessMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const [validationErrors, setValidationErrors] = useState({});
+    const [previewImage, setPreviewImage] = useState(null);
 
-    // Unwrap params using React.use()
-    const productId = React.use(params).id;
+    // Access productId from params
+    const productId = params.id;
 
     // Fetch the existing product data when the component mounts
     useEffect(() => {
@@ -26,6 +28,7 @@ const Page = ({ params }) => {
             try {
                 const response = await axios.get(`http://localhost:8000/api/products/${productId}`);
                 setProduct(response.data);
+                setPreviewImage(`http://localhost:8000/images/${response.data.image}`);
             } catch (error) {
                 console.error('Error fetching product:', error);
                 setErrorMessage("Error fetching product data.");
@@ -43,17 +46,44 @@ const Page = ({ params }) => {
         });
     };
 
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        setProduct({ ...product, image: file });
+
+        // Update preview image
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewImage(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.put(`http://localhost:8000/api/products/${productId}`, product);
+            const formData = new FormData();
+            formData.append('product_name', product.product_name);
+            formData.append('price', product.price);
+            formData.append('description', product.description);
+            formData.append('status', product.status);
+            if (product.image instanceof File) {
+                formData.append('image', product.image);
+            }
+
+            const response = await axios.put(`http://localhost:8000/api/products/${productId}`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
             console.log('Product updated:', response.data);
-            
             setSuccessMessage(response.data.message);
             setErrorMessage(""); // Clear any previous error messages
             setValidationErrors({}); // Clear validation errors
 
-            // Redirect to the products page after successful update
+            // Redirect to the products page after a successful update
             if (response.data.flag === true) {
                 router.push('/product');
             }
@@ -112,7 +142,7 @@ const Page = ({ params }) => {
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit}>
+                        <form onSubmit={handleSubmit} encType="multipart/form-data">
                             <div className='form-group'>
                                 <label>Product Name</label>
                                 <input
@@ -156,6 +186,23 @@ const Page = ({ params }) => {
                                     <option value="1">Active</option>
                                     <option value="0">Inactive</option>
                                 </select>
+                            </div>
+                            <div className='form-group'>
+                                <label>Product Image</label>
+                                <input
+                                    type='file'
+                                    className='form-control'
+                                    onChange={handleImageChange}
+                                />
+
+                                {/* Image Preview */}
+                                {previewImage && (
+                                    <img
+                                        src={previewImage}
+                                        alt={product.product_name}
+                                        style={{ width: '100px', height: 'auto', marginTop: '10px' }}
+                                    />
+                                )}
                             </div>
                             <div className='form-group mt-3'>
                                 <input
